@@ -1,8 +1,0 @@
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\bin\Release\ATH Finder.exe.config
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\bin\Release\ATH Finder.exe
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\bin\Release\ATH Finder.pdb
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\obj\Release\ATHFinder.FormATHFinder.resources
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\obj\Release\ATHFinder.Resources.resources
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\obj\Release\WindowsApplication3.vbproj.GenerateResource.Cache
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\obj\Release\ATH Finder.exe
-c:\users\asmir\documents\visual studio 2013\Projects\WindowsApplication3\WindowsApplication3\obj\Release\ATH Finder.pdb
