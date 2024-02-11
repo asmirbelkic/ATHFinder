@@ -211,6 +211,7 @@ Partial Class FormATHFinder
         '
         'ATHRef
         '
+        Me.ATHRef.AccessibleRole = System.Windows.Forms.AccessibleRole.None
         Me.ATHRef.Anchor = CType(((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Left) _
             Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
         Me.ATHRef.BorderStyle = System.Windows.Forms.BorderStyle.None
