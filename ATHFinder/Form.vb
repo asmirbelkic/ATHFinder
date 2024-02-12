@@ -5,70 +5,8 @@ Imports System.Diagnostics ' Pour Process.Start
 
 
 Public Class FormATHFinder
-    Private defaultPath As String = "C:\MicrautoASP\ASP\Fichier\FleetBox\"
     ' Liste pour stocker les chemins des fichiers trouvés correspondants
-    Private foundFilePaths As New List(Of String)
-
-    ' Définissez un objet personnalisé pour contenir les données extraites
-    Public Class WorkOrderData
-        Public Property AthorisReferences As List(Of String) = New List(Of String)()
-        Public Property ORStatus As List(Of String) = New List(Of String)()
-        Public Property StatusCodeDescription As String = String.Empty
-        Public Property FormattedDate As String = String.Empty
-    End Class
-
-
-    Private Function ExtractDataFromXml(file As String, txtBox As String) As WorkOrderData
-        Dim data As New WorkOrderData()
-
-        Try
-            Dim doc As XDocument = XDocument.Load(file)
-
-            ' Extraire l'espace de noms du premier élément workOrder (ou tout autre élément pertinent)
-            Dim workOrderElement = doc.Descendants().FirstOrDefault(Function(x) x.Name.LocalName = "workOrder")
-            If workOrderElement Is Nothing Then
-                Console.WriteLine("Aucun élément workOrder trouvé.")
-                Return data ' Retourne un objet data vide si aucun workOrder n'est trouvé
-            End If
-
-            Dim ns As XNamespace = workOrderElement.Name.Namespace
-
-            ' Utiliser l'espace de noms extrait pour accéder aux éléments workOrder
-            Dim workOrders = doc.Descendants(ns + "workOrder").Where(Function(x) x.Attribute("repairerReference") IsNot Nothing AndAlso x.Attribute("repairerReference").Value = txtBox)
-
-            Console.WriteLine("Nombre de workOrders trouvés : " & workOrders.Count())
-
-            If workOrders.Any() Then
-                data.AthorisReferences.AddRange(workOrders.Select(Function(x) x.Attribute("athorisReference").Value))
-                data.ORStatus.AddRange(workOrders.Select(Function(x) x.Attribute("state").Value))
-                Console.WriteLine("AthorisReferences : " & String.Join(", ", data.AthorisReferences))
-                Console.WriteLine("ORStatus : " & String.Join(", ", data.ORStatus))
-
-                ' Accéder à l'élément status en utilisant l'espace de noms extrait
-                Dim status = doc.Descendants(ns + "status").FirstOrDefault()
-                If status IsNot Nothing Then
-                    data.StatusCodeDescription = status.Element(ns + "statusCode").Attribute("description").Value
-                    Console.WriteLine("StatusCodeDescription : " & data.StatusCodeDescription)
-                    Dim timeInput = status.Attribute("timeInput").Value
-                    If DateTime.TryParse(timeInput, New DateTime()) Then
-                        Dim parsedDate As DateTime = DateTime.Parse(timeInput, System.Globalization.CultureInfo.InvariantCulture)
-                        data.FormattedDate = parsedDate.ToString("le dd/MM/yyyy à HH:mm")
-                        Console.WriteLine("FormattedDate : " & data.FormattedDate)
-                    End If
-                End If
-            End If
-        Catch ex As System.IO.FileNotFoundException
-            Console.WriteLine("Le fichier spécifié n'a pas été trouvé : " & ex.Message)
-        Catch ex As System.Xml.XmlException
-            Console.WriteLine("Erreur de lecture du fichier XML : " & ex.Message)
-        Catch ex As Exception
-            Console.WriteLine("Une erreur inattendue est survenue : " & ex.Message)
-        End Try
-
-        Return data
-    End Function
-
-
+    Private ReadOnly foundFilePaths As New List(Of String)
 
     Private Sub Search_Click(sender As Object, e As EventArgs) Handles Search.Click
         Dim txtBox As String = ORTextBox.Text
@@ -76,14 +14,26 @@ Public Class FormATHFinder
         SearchFile(txtBox, directory)
     End Sub
 
-    Private Sub Ouvrir_Click(sender As Object, e As EventArgs) Handles Ouvrir.Click
-        ' Ouvre le premier fichier XML où la référence de l'OR a été trouvée avec Notepad
-        If foundFilePaths.Count() Then
-            For Each file In foundFilePaths
-                Process.Start("explorer.exe", file) ' Ouvrir avec Notepad
+    Private Async Sub Ouvrir_Click(sender As Object, e As EventArgs) Handles Ouvrir.Click
+        ' Ouvre tous les fichiers XML où la référence de l'OR a été trouvée
+        If foundFilePaths.Count > 0 Then
+            For Each filePath In foundFilePaths
+                Try
+                    ' Ouvre chaque fichier avec l'application par défaut pour les fichiers XML
+                    Process.Start(filePath)
+                    ' Attendre 500 ms avant d'ouvrir le prochain fichier
+                    Await Task.Delay(500)
+                Catch ex As Exception
+                    ' Afficher un message d'erreur si le fichier ne peut pas être ouvert
+                    MessageBox.Show($"Impossible d'ouvrir le fichier : {filePath}" & vbCrLf & ex.Message, "Erreur", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                End Try
             Next
+        Else
+            MessageBox.Show("Aucun fichier trouvé à ouvrir.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
         End If
     End Sub
+
+
 
     Private Sub Changer_Click(sender As Object, e As EventArgs) Handles Changer.Click
         Dir = GetFolder()
@@ -92,7 +42,7 @@ Public Class FormATHFinder
 
     Private Sub FormATHFinder_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         CheckForUpdates()
-        Dim currentVersion As Version = New Version(Application.ProductVersion)
+        Dim currentVersion As New Version(Application.ProductVersion)
         Dim shortVersion As String = String.Format("{0}.{1}", currentVersion.Major, currentVersion.Minor)
         Label4.Text = String.Format("ATH Finder by Asmir {0} - Pour Solware 2024", shortVersion)
 
@@ -101,8 +51,8 @@ Public Class FormATHFinder
         ' Liste des chemins de dossiers potentiels
         Dim potentialPaths As New List(Of String) From {
             "C:\MicrautoASP\ASP\Fichier\FleetBox\",
-            "R:\WINmotor\SOC1\Fleetbox\",
-            "R:\MicrautoASP\ASP\Fichier\FleetBox"
+            "C:WINmotor\SOC1\Fleetbox\log",
+            "R:WINmotor\SOC1\Fleetbox\log"
         }
 
         ' Trouver le chemin avec le fichier *_RETOUR.xml le plus récent
@@ -118,7 +68,7 @@ Public Class FormATHFinder
     End Sub
 
     Public Sub CheckForUpdates()
-        Dim currentVersion As Version = New Version(Application.ProductVersion)
+        Dim currentVersion As New Version(Application.ProductVersion)
         ' Créer une instance de MyWebClient avec un timeout de 10 secondes (10000 millisecondes)
         Dim webClient As New MyWebClient(10000)
 
@@ -131,7 +81,7 @@ Public Class FormATHFinder
         Try
             ' Modifier l'URL par l'emplacement de votre fichier version.txt ou update.json sur GitHub
             Dim latestVersionString As String = webClient.DownloadString("https://pastebin.com/raw/vvXtLBvm")
-            Dim latestVersion As Version = New Version(latestVersionString.Trim())
+            Dim latestVersion As New Version(latestVersionString.Trim())
 
             If latestVersion > currentVersion Then
                 ' Une nouvelle version est disponible, demandez si l'utilisateur souhaite la télécharger
@@ -221,50 +171,109 @@ Public Class FormATHFinder
     End Function
 
 
+    ' Définissez un objet personnalisé pour contenir les données extraites
+    Public Class WorkOrderData
+        Public Property InputDate As DateTime ' Ajouter cette ligne pour la date d'entrée
+        Public Property AthorisReferences As List(Of String) = New List(Of String)()
+        Public Property ORStatus As List(Of String) = New List(Of String)()
+        Public Property StatusCodeDescription As String = String.Empty
+        Public Property FormattedDate As String = String.Empty
+    End Class
+
+
+    Private Function ExtractDataFromXml(file As String, txtBox As String) As WorkOrderData
+        Dim data As New WorkOrderData()
+
+        Try
+            Dim doc As XDocument = XDocument.Load(file)
+
+            ' Extraire l'espace de noms du premier élément workOrder (ou tout autre élément pertinent)
+            Dim workOrderElement = doc.Descendants().FirstOrDefault(Function(x) x.Name.LocalName = "workOrder")
+            If workOrderElement Is Nothing Then
+                Return data ' Retourne un objet data vide si aucun workOrder n'est trouvé
+            End If
+
+            Dim ns As XNamespace = workOrderElement.Name.Namespace
+
+            ' Utiliser l'espace de noms extrait pour accéder aux éléments workOrder
+            Dim workOrders = doc.Descendants(ns + "workOrder").Where(Function(x) x.Attribute("repairerReference") IsNot Nothing AndAlso x.Attribute("repairerReference").Value = txtBox)
+
+
+
+            If workOrders.Any() Then
+                data.AthorisReferences.AddRange(workOrders.Select(Function(x) x.Attribute("athorisReference").Value))
+                data.ORStatus.AddRange(workOrders _
+                        .Where(Function(x) x.Attribute("state") IsNot Nothing) _
+                        .Select(Function(x) x.Attribute("state").Value))
+
+
+                ' Accéder à l'élément status en utilisant l'espace de noms extrait
+                Dim status = doc.Descendants(ns + "status").FirstOrDefault()
+                If status IsNot Nothing Then
+                    data.StatusCodeDescription = status.Element(ns + "statusCode").Attribute("description").Value
+                    Dim timeInput = status.Attribute("timeInput").Value
+                    If DateTime.TryParse(timeInput, data.InputDate) Then
+                        ' Si le parsing est réussi, data.InputDate contiendra la date d'entrée
+                        data.FormattedDate = data.InputDate.ToString("le dd/MM/yyyy à HH:mm")
+                    End If
+                End If
+            End If
+        Catch ex As System.IO.FileNotFoundException
+            Console.WriteLine("Le fichier spécifié n'a pas été trouvé : " & ex.Message)
+        Catch ex As System.Xml.XmlException
+            Console.WriteLine("Erreur de lecture du fichier XML : " & ex.Message)
+        Catch ex As Exception
+            Console.WriteLine("Une erreur inattendue est survenue : " & ex.Message)
+        End Try
+
+        Return data
+    End Function
+
     Private Sub SearchFile(ByVal txtBox As String, ByVal directory As String)
-        foundFilePaths.Clear() ' Vider la liste pour la nouvelle recherche
+        foundFilePaths.Clear()
         BoxORStatus.Clear()
         ATHRef.Clear()
         ATHStatus.Clear()
-        Ouvrir.Enabled = False ' Désactiver le bouton par défaut
-        StatusDate.Clear() ' S'assurer que StatusDate est également vidé
+        Ouvrir.Enabled = False
+        StatusDate.Clear()
 
-        Dim allAthorisReferences As New List(Of String)
-        Dim allORStatus As New List(Of String)
-        Dim allFormattedDates As New List(Of String)
-        Dim allStatusCodeDescriptions As New List(Of String)
+        Dim latestFileDate As DateTime = DateTime.MinValue
+        Dim latestInputDate As DateTime = DateTime.MinValue
+        Dim selectedFileData As WorkOrderData = Nothing
 
         If txtBox.Length > 1 AndAlso Not System.Text.RegularExpressions.Regex.IsMatch(txtBox, "[^a-zA-Z0-9 .-]") Then
-            ' Récupérer tous les fichiers *_RETOUR.XML dans le répertoire spécifié
             Dim files As String() = System.IO.Directory.GetFiles(directory, "*_RETOUR.XML")
-
-            If files.Length > 0 Then ' Vérifier s'il existe des fichiers XML
+            If files.Length > 0 Then
                 For Each file As String In files
                     Dim data As WorkOrderData = ExtractDataFromXml(file, txtBox)
-
+                    ' Ajoutez le fichier à foundFilePaths si la référence correspond, indépendamment des conditions de date
                     If data.AthorisReferences.Count > 0 Then
-                        foundFilePaths.Add(file) ' Ajoute le chemin du fichier à la liste si des correspondances sont trouvées
-                        allAthorisReferences.AddRange(data.AthorisReferences)
-                        allORStatus.AddRange(data.ORStatus)
-                        allFormattedDates.Add(data.FormattedDate)
-                        allStatusCodeDescriptions.Add(data.StatusCodeDescription)
+                        Console.WriteLine(file)
+                        foundFilePaths.Add(file)
+                        ' Sélectionnez séparément le fichier le plus récent
+                        Dim fileCreationDate As Date = IO.File.GetCreationTime(file)
+                        If data.InputDate > latestInputDate OrElse (data.InputDate = latestInputDate AndAlso fileCreationDate > latestFileDate) Then
+                            latestInputDate = data.InputDate
+                            latestFileDate = fileCreationDate
+                            selectedFileData = data
+                        End If
                     End If
                 Next
 
-                If allAthorisReferences.Count = 0 Then
-                    MessageBox.Show("L'OR " & txtBox & " est introuvable dans les fichiers existants", "Erreur")
-                ElseIf allAthorisReferences.Count = 1 Then
-                    athorisReference = allAthorisReferences.First()
+                If selectedFileData IsNot Nothing Then
+                    ' Mise à jour de l'UI avec les données du fichier sélectionné
+                    athorisReference = selectedFileData.AthorisReferences.First()
                     CopyATH.Enabled = True
-                    ATHRef.Text = allAthorisReferences.First()
-                    BoxORStatus.Text = allORStatus.First()
-                    StatusDate.Text = allFormattedDates.First()
-                    ATHStatus.Text = allStatusCodeDescriptions.First()
-                    Ouvrir.Enabled = True ' Activer le bouton si une correspondance est trouvée
+                    ATHRef.Text = String.Join(", ", selectedFileData.AthorisReferences)
+                    BoxORStatus.Text = String.Join(", ", selectedFileData.ORStatus)
+                    StatusDate.Text = selectedFileData.FormattedDate
+                    ATHStatus.Text = selectedFileData.StatusCodeDescription
+                    Ouvrir.Enabled = True
+                ElseIf foundFilePaths.Count > 0 Then
+                    ' Si des fichiers correspondants ont été trouvés mais aucun n'est sélectionné comme le plus récent
+                    MessageBox.Show("Des fichiers correspondants ont été trouvés mais aucun n'a pu être identifié comme le plus récent basé sur les critères donnés.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information)
                 Else
-                    ' Si plusieurs correspondances sont trouvées à travers tous les fichiers
-                    MessageBox.Show("Attention ! Plusieurs références ont été trouvées.", "Erreur")
-                    Ouvrir.Enabled = True ' Activer le bouton pour permettre une vérification manuelle
+                    MessageBox.Show("L'OR " & txtBox & " est introuvable dans les fichiers existants", "Erreur")
                 End If
             Else
                 MessageBox.Show("Aucun fichier XML trouvé dans le répertoire spécifié.", "Erreur")
